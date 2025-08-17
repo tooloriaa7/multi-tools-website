@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tooloria — Image Converter</title>
+  <!-- Tailwind CSS (CDN) for a clean dark UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tailwind config: dark theme colors
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: {
+              DEFAULT: '#0b0f14',
+              soft: '#121821'
+            },
+            card: '#0f1722',
+            accent: '#60a5fa'
+          },
+          boxShadow: {
+            soft: '0 10px 30px rgba(0,0,0,.35)'
+          }
+        }
+      }
+    }
+  </script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- UTIF.js for TIFF decode/encode support -->
+  <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+  <style>
+    /* Hide the raw canvas; we use it for processing */
+    #workCanvas { display: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  </style>
+</head>
+<body class="bg-bg text-white min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-10">
+    <!-- Header -->
+    <header class="mb-8">
+      <h1 class="text-3xl md:text-4xl font-bold tracking-tight">🧰 Tooloria — Image Converter</h1>
+      <p class="text-white/70 mt-2">Upload an image → choose an output format → convert → preview & download. Supports PNG, JPG/JPEG, PDF, BMP, GIF*, WEBP, TIFF*. (*Browser-dependent)</p>
+    </header>
+
+    <!-- Card -->
+    <section class="bg-card/60 backdrop-blur rounded-2xl shadow-soft p-5 md:p-7 border border-white/5">
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Left: Inputs -->
+        <div class="space-y-5">
+          <!-- File input -->
+          <div>
+            <label for="fileInput" class="block text-sm font-medium text-white/80 mb-2">Upload Image</label>
+            <input id="fileInput" type="file" accept="image/png,image/jpeg,image/jpg,image/bmp,image/gif,image/tiff,image/webp" class="file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-black hover:file:opacity-90 block w-full text-sm text-white/80 bg-bg/60 rounded-xl border border-white/10 p-2" />
+            <p id="fileHelp" class="text-xs text-white/50 mt-2">Max ~25MB. Supported inputs: PNG, JPG/JPEG, BMP, GIF (first frame), TIFF (via decoder), WEBP.</p>
+          </div>
+
+          <!-- Output format -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-white/80 mb-2">Output Format</label>
+              <select id="formatSelect" class="w-full bg-bg/60 border border-white/10 rounded-xl p-2 text-sm">
+                <option value="png">PNG (.png)</option>
+                <option value="jpeg">JPG/JPEG (.jpg)</option>
+                <option value="webp">WEBP (.webp)</option>
+                <option value="pdf">PDF (.pdf)</option>
+                <option value="bmp">BMP (.bmp)</option>
+                <option value="gif">GIF (.gif) — single frame</option>
+                <option value="tiff">TIFF (.tiff)</option>
+              </select>
+            </div>
+
+            <div id="qualityGroup">
+              <label class="block text-sm font-medium text-white/80 mb-2">Quality (JPEG/WEBP)</label>
+              <input id="qualityRange" type="range" min="40" max="100" step="1" value="90" class="w-full" />
+              <div class="text-xs text-white/50 mt-1">Current: <span id="qualityVal">90</span></div>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="flex flex-wrap gap-3">
+            <button id="convertBtn" class="px-5 py-2.5 rounded-xl bg-accent text-black font-semibold hover:opacity-90 transition">Convert</button>
+            <button id="resetBtn" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 transition">Reset</button>
+          </div>
+
+          <!-- Status / Errors -->
+          <div id="status" class="text-sm text-white/70"></div>
+          <div id="error" class="text-sm text-red-400"></div>
+        </div>
+
+        <!-- Right: Previews -->
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 gap-4">
+            <div class="bg-bg/40 rounded-xl border border-white/5 p-3">
+              <h3 class="font-semibold mb-2">Input Preview</h3>
+              <div id="inputPreview" class="aspect-video bg-black/30 rounded-lg flex items-center justify-center overflow-hidden">
+                <span class="text-white/40 text-sm">No file selected</span>
+              </div>
+            </div>
+            <div class="bg-bg/40 rounded-xl border border-white/5 p-3">
+              <h3 class="font-semibold mb-2">Output Preview</h3>
+              <div id="outputPreview" class="aspect-video bg-black/30 rounded-lg flex items-center justify-center overflow-hidden">
+                <span class="text-white/40 text-sm">No output yet</span>
+              </div>
+              <div class="mt-3 flex items-center gap-3">
+                <a id="downloadLink" href="#" download class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 transition text-sm hidden">Download</a>
+                <span id="meta" class="text-xs text-white/50"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <canvas id="workCanvas"></canvas>
+    </section>
+
+    <footer class="text-xs text-white/40 mt-6">
+      Notes: Animated GIFs will be flattened to the first frame. TIFF support is provided via UTIF.js and may vary by browser. BMP/GIF output are basic/experimental. For best quality, prefer PNG/JPEG/WEBP/PDF.
+    </footer>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const formatSelect = document.getElementById('formatSelect');
+    const qualityGroup = document.getElementById('qualityGroup');
+    const qualityRange = document.getElementById('qualityRange');
+    const qualityVal = document.getElementById('qualityVal');
+    const convertBtn = document.getElementById('convertBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+    const inputPreview = document.getElementById('inputPreview');
+    const outputPreview = document.getElementById('outputPreview');
+    const downloadLink = document.getElementById('downloadLink');
+    const metaEl = document.getElementById('meta');
+    const canvas = document.getElementById('workCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const MAX_FILE_MB = 25;
+
+    let originalFile = null;
+    let originalImageBitmap = null;
+    let originalInfo = null; // {width,height,type}
+
+    qualityRange.addEventListener('input', () => {
+      qualityVal.textContent = qualityRange.value;
+    });
+
+    formatSelect.addEventListener('change', () => {
+      const fmt = formatSelect.value;
+      qualityGroup.style.display = (fmt === 'jpeg' || fmt === 'webp') ? 'block' : 'none';
+    });
+
+    resetBtn.addEventListener('click', () => {
+      clearAll();
+    });
+
+    function clearAll(){
+      originalFile = null;
+      originalImageBitmap = null;
+      originalInfo = null;
+      fileInput.value = '';
+      inputPreview.innerHTML = '<span class="text-white/40 text-sm">No file selected</span>';
+      outputPreview.innerHTML = '<span class="text-white/40 text-sm">No output yet</span>';
+      downloadLink.classList.add('hidden');
+      downloadLink.href = '#';
+      statusEl.textContent = '';
+      errorEl.textContent = '';
+      metaEl.textContent = '';
+    }
+
+    fileInput.addEventListener('change', async (e) => {
+      clearMessages();
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        showError(`File too large. Max ${MAX_FILE_MB}MB.`);
+        fileInput.value = '';
+        return;
+      }
+
+      const type = (file.type || '').toLowerCase();
+      const allowed = [
+        'image/png','image/jpeg','image/jpg','image/gif','image/tiff','image/webp','image/bmp'
+      ];
+      if (!allowed.includes(type)) {
+        showError('Unsupported file type. Please upload PNG, JPG/JPEG, BMP, GIF, TIFF, or WEBP.');
+        fileInput.value='';
+        return;
+      }
+
+      originalFile = file;
+      try {
+        const { bitmap, width, height } = await decodeToBitmap(file);
+        originalImageBitmap = bitmap;
+        originalInfo = { width, height, type };
+        showInputPreview(file, bitmap, width, height);
+      } catch (err) {
+        console.error(err);
+        showError('Could not read this file. Your browser might not support this format.');
+      }
+    });
+
+    function clearMessages(){
+      statusEl.textContent = '';
+      errorEl.textContent = '';
+    }
+
+    function showStatus(msg){ statusEl.textContent = msg; }
+    function showError(msg){ errorEl.textContent = msg; }
+
+    function showInputPreview(file, bitmap, w, h){
+      // Display the original as an <img> for preview
+      const url = URL.createObjectURL(file);
+      inputPreview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Input preview';
+      img.className = 'max-h-72 w-auto object-contain mx-auto rounded-lg';
+      inputPreview.appendChild(img);
+    }
+
+    async function decodeToBitmap(file){
+      const type = (file.type || '').toLowerCase();
+      // TIFF needs special handling via UTIF
+      if (type === 'image/tiff' || type === 'image/tif') {
+        const buffer = await file.arrayBuffer();
+        const ifds = UTIF.decode(buffer);
+        if (ifds.length === 0) throw new Error('No IFDs in TIFF');
+        UTIF.decodeImages(buffer, ifds);
+        const rgba = UTIF.toRGBA8(ifds[0]);
+        const w = ifds[0].width, h = ifds[0].height;
+        const off = new OffscreenCanvas(w, h);
+        const octx = off.getContext('2d');
+        const imgData = new ImageData(new Uint8ClampedArray(rgba), w, h);
+        octx.putImageData(imgData, 0, 0);
+        const bitmap = await createImageBitmap(off);
+        return { bitmap, width: w, height: h };
+      } else {
+        // Other formats: rely on browser decoder
+        const bitmap = await createImageBitmap(file);
+        return { bitmap, width: bitmap.width, height: bitmap.height };
+      }
+    }
+
+    convertBtn.addEventListener('click', async () => {
+      clearMessages();
+      if (!originalFile || !originalImageBitmap) {
+        showError('Please upload an image first.');
+        return;
+      }
+
+      const fmt = formatSelect.value; // png | jpeg | webp | pdf | bmp | gif | tiff
+      showStatus('Processing image…');
+      downloadLink.classList.add('hidden');
+      metaEl.textContent = '';
+      outputPreview.innerHTML = '<div class="animate-pulse text-white/60">Working…</div>';
+
+      try {
+        const result = await convertImage(originalImageBitmap, fmt);
+        const { blob, name, width, height } = result;
+        const url = URL.createObjectURL(blob);
+
+        // Set download link
+        downloadLink.href = url;
+        downloadLink.download = name;
+        downloadLink.classList.remove('hidden');
+
+        // Show output preview
+        await showOutputPreview(url, fmt);
+
+        // Meta info
+        const kb = Math.max(1, Math.round(blob.size / 1024));
+        metaEl.textContent = `${width}×${height}px • ~${kb.toLocaleString()} KB • ${fmt.toUpperCase()}`;
+        showStatus('Done.');
+      } catch (err) {
+        console.error(err);
+        showError(err.message || 'Conversion failed.');
+        outputPreview.innerHTML = '<span class="text-white/40 text-sm">No output</span>';
+      }
+    });
+
+    async function convertImage(bitmap, fmt){
+      const w = bitmap.width, h = bitmap.height;
+      canvas.width = w; canvas.height = h;
+      ctx.clearRect(0,0,w,h);
+      ctx.drawImage(bitmap, 0, 0);
+
+      if (fmt === 'png') {
+        const blob = await canvasToBlob(canvas, 'image/png');
+        return { blob, name: fileBaseName(originalFile.name) + '.png', width: w, height: h };
+      }
+
+      if (fmt === 'jpeg') {
+        const q = Number(qualityRange.value) / 100;
+        const blob = await canvasToBlob(canvas, 'image/jpeg', q);
+        return { blob, name: fileBaseName(originalFile.name) + '.jpg', width: w, height: h };
+      }
+
+      if (fmt === 'webp') {
+        const q = Number(qualityRange.value) / 100;
+        const blob = await canvasToBlob(canvas, 'image/webp', q);
+        if (!blob) throw new Error('WEBP not supported by this browser.');
+        return { blob, name: fileBaseName(originalFile.name) + '.webp', width: w, height: h };
+      }
+
+      if (fmt === 'pdf') {
+        // Create a single-page PDF sized to image in points (1 pt = 1/72 in). Assume 96 DPI canvas and scale to fit A4 if too large.
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) throw new Error('PDF library failed to load.');
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+        // Fit onto A4 portrait while preserving aspect
+        const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const imgRatio = w / h;
+        let drawW = pageW - 40, drawH = drawW / imgRatio; // 20pt margins
+        if (drawH > pageH - 40) {
+          drawH = pageH - 40;
+          drawW = drawH * imgRatio;
+        }
+        const x = (pageW - drawW) / 2;
+        const y = (pageH - drawH) / 2;
+        pdf.addImage(imgData, 'JPEG', x, y, drawW, drawH);
+        const blob = pdf.output('blob');
+        return { blob, name: fileBaseName(originalFile.name) + '.pdf', width: w, height: h };
+      }
+
+      if (fmt === 'bmp') {
+        const blob = canvasToBMPBlob(canvas);
+        return { blob, name: fileBaseName(originalFile.name) + '.bmp', width: w, height: h };
+      }
+
+      if (fmt === 'gif') {
+        // Single-frame GIF encoder (very basic, no dithering). We quantize to 256 colors.
+        const blob = await canvasToSingleFrameGIF(canvas);
+        if (!blob) throw new Error('GIF export is not supported in this environment.');
+        return { blob, name: fileBaseName(originalFile.name) + '.gif', width: w, height: h };
+      }
+
+      if (fmt === 'tiff') {
+        if (typeof UTIF === 'undefined') throw new Error('TIFF library failed to load.');
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const rgba = imgData.data; // Uint8ClampedArray
+        // UTIF expects RGBA as Uint8Array
+        const buf = UTIF.encodeImage(rgba, w, h);
+        const tiff = UTIF.encode([buf]);
+        const blob = new Blob([new Uint8Array(tiff)], { type: 'image/tiff' });
+        return { blob, name: fileBaseName(originalFile.name) + '.tiff', width: w, height: h };
+      }
+
+      throw new Error('Unknown format.');
+    }
+
+    function fileBaseName(name){
+      const dot = name.lastIndexOf('.');
+      return dot >= 0 ? name.slice(0, dot) : name;
+    }
+
+    async function canvasToBlob(cnv, type, quality){
+      return new Promise(resolve => cnv.toBlob(resolve, type, quality));
+    }
+
+    async function showOutputPreview(url, fmt){
+      outputPreview.innerHTML = '';
+      // For PDF, show an icon/iframe; images as <img>
+      if (fmt === 'pdf') {
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.className = 'w-full h-72 rounded-lg bg-white';
+        outputPreview.appendChild(iframe);
+      } else {
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Output preview';
+        img.className = 'max-h-72 w-auto object-contain mx-auto rounded-lg';
+        outputPreview.appendChild(img);
+      }
+    }
+
+    // --- BMP encoder (24-bit, no alpha) ---
+    function canvasToBMPBlob(cnv){
+      const w = cnv.width, h = cnv.height;
+      const imageData = cnv.getContext('2d').getImageData(0,0,w,h).data;
+
+      const rowSize = Math.floor((24 * w + 31) / 32) * 4; // row size with padding
+      const pixelArraySize = rowSize * h;
+      const fileHeaderSize = 14;
+      const infoHeaderSize = 40;
+      const fileSize = fileHeaderSize + infoHeaderSize + pixelArraySize;
+
+      const buffer = new ArrayBuffer(fileSize);
+      const dv = new DataView(buffer);
+      let offset = 0;
+
+      // BITMAPFILEHEADER
+      dv.setUint8(offset, 0x42); offset++; // 'B'
+      dv.setUint8(offset, 0x4D); offset++; // 'M'
+      dv.setUint32(offset, fileSize, true); offset += 4;
+      dv.setUint16(offset, 0, true); offset += 2; // reserved1
+      dv.setUint16(offset, 0, true); offset += 2; // reserved2
+      dv.setUint32(offset, fileHeaderSize + infoHeaderSize, true); offset += 4; // pixel data offset
+
+      // BITMAPINFOHEADER
+      dv.setUint32(offset, infoHeaderSize, true); offset += 4;
+      dv.setInt32(offset, w, true); offset += 4;
+      dv.setInt32(offset, h, true); offset += 4;
+      dv.setUint16(offset, 1, true); offset += 2; // planes
+      dv.setUint16(offset, 24, true); offset += 2; // bpp
+      dv.setUint32(offset, 0, true); offset += 4; // compression (BI_RGB)
+      dv.setUint32(offset, pixelArraySize, true); offset += 4;
+      dv.setInt32(offset, 2835, true); offset += 4; // x ppm (72 DPI)
+      dv.setInt32(offset, 2835, true); offset += 4; // y ppm
+      dv.setUint32(offset, 0, true); offset += 4; // colors used
+      dv.setUint32(offset, 0, true); offset += 4; // important colors
+
+      // Pixel data (BGR, bottom-up)
+      const padding = rowSize - w * 3;
+      let p = fileHeaderSize + infoHeaderSize;
+      for (let y = h - 1; y >= 0; y--) {
+        for (let x = 0; x < w; x++) {
+          const idx = (y * w + x) * 4;
+          const r = imageData[idx];
+          const g = imageData[idx + 1];
+          const b = imageData[idx + 2];
+          dv.setUint8(p++, b);
+          dv.setUint8(p++, g);
+          dv.setUint8(p++, r);
+        }
+        for (let i = 0; i < padding; i++) dv.setUint8(p++, 0);
+      }
+
+      return new Blob([buffer], { type: 'image/bmp' });
+    }
+
+    // --- Very small single-frame GIF encoder ---
+    // This is a minimal, naive implementation creating an 8-bit palettized GIF using canvas quantization via octree (simple).
+    async function canvasToSingleFrameGIF(cnv){
+      try {
+        const w = cnv.width, h = cnv.height;
+        const imgData = cnv.getContext('2d').getImageData(0,0,w,h).data;
+        const { palette, indexed } = quantizeImage(imgData, w, h, 256);
+        const gifBytes = buildGIF(w, h, palette, indexed);
+        return new Blob([new Uint8Array(gifBytes)], { type: 'image/gif' });
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    }
+
+    // --- Simple median-cut quantization (very rough) ---
+    function quantizeImage(rgba, w, h, maxColors){
+      // Collect colors (subsample for speed on huge images)
+      const step = Math.max(1, Math.floor((w*h)/50000));
+      const colors = [];
+      for (let i=0; i<rgba.length; i+=4*step){
+        const a = rgba[i+3];
+        if (a < 16) continue; // skip near transparent
+        colors.push([rgba[i], rgba[i+1], rgba[i+2]]);
+      }
+      if (colors.length === 0) colors.push([0,0,0]);
+      // median-cut boxes
+      let boxes = [{colors, r0:0,r1:255,g0:0,g1:255,b0:0,b1:255}];
+      while (boxes.length < maxColors) {
+        boxes.sort((A,B)=>volume(B)-volume(A));
+        const box = boxes.shift();
+        if (!box || box.colors.length <= 1) break;
+        const rangeR = box.r1 - box.r0, rangeG = box.g1 - box.g0, rangeB = box.b1 - box.b0;
+        let channel = 'r';
+        if (rangeG >= rangeR && rangeG >= rangeB) channel='g';
+        else if (rangeB >= rangeR && rangeB >= rangeG) channel='b';
+        const idx = channel==='r'?0:channel==='g'?1:2;
+        box.colors.sort((a,b)=>a[idx]-b[idx]);
+        const mid = Math.floor(box.colors.length/2);
+        const c1 = box.colors.slice(0, mid);
+        const c2 = box.colors.slice(mid);
+        const [r0,r1,g0,g1,b0,b1] = bounds(box.colors);
+        const [ar0,ar1,ag0,ag1,ab0,ab1] = bounds(c1);
+        const [br0,br1,bg0,bg1,bb0,bb1] = bounds(c2);
+        boxes.push({colors:c1, r0:ar0,r1:ar1,g0:ag0,g1:ag1,b0:ab0,b1:ab1});
+        boxes.push({colors:c2, r0:br0,r1:br1,g0:bg0,g1:bg1,b0:bb0,b1:bb1});
+      }
+      const palette = boxes.map(b=>avg(b.colors));
+      const palBytes = [];
+      palette.forEach(c=>{ palBytes.push(c[0],c[1],c[2]); });
+      while (palBytes.length < 256*3) palBytes.push(0); // pad to 256 colors
+
+      // map pixels
+      const indexed = new Uint8Array(w*h);
+      for (let y=0; y<h; y++){
+        for (let x=0; x<w; x++){
+          const i = (y*w + x) * 4;
+          const a = rgba[i+3];
+          if (a < 16) { indexed[y*w+x] = 0; continue; }
+          const r = rgba[i], g = rgba[i+1], b = rgba[i+2];
+          indexed[y*w+x] = nearestIndex(palette, r,g,b);
+        }
+      }
+      return { palette: new Uint8Array(palBytes), indexed };
+
+      function volume(b){ return (b.r1-b.r0+1)*(b.g1-b.g0+1)*(b.b1-b.b0+1); }
+      function bounds(cols){
+        let r0=255,r1=0,g0=255,g1=0,b0=255,b1=0;
+        cols.forEach(c=>{ r0=Math.min(r0,c[0]); r1=Math.max(r1,c[0]); g0=Math.min(g0,c[1]); g1=Math.max(g1,c[1]); b0=Math.min(b0,c[2]); b1=Math.max(b1,c[2]); });
+        return [r0,r1,g0,g1,b0,b1];
+      }
+      function avg(cols){
+        let r=0,g=0,b=0; cols.forEach(c=>{ r+=c[0]; g+=c[1]; b+=c[2]; });
+        const n = Math.max(1, cols.length);
+        return [Math.round(r/n), Math.round(g/n), Math.round(b/n)];
+      }
+      function nearestIndex(pal, r,g,b){
+        let best=0, bestD=1e12;
+        for (let i=0; i<pal.length; i++){
+          const c = pal[i]; if (!c) continue;
+          const dr = r - c[0]; const dg = g - c[1]; const db = b - c[2];
+          const d = dr*dr + dg*dg + db*db;
+          if (d < bestD){ bestD = d; best = i; }
+        }
+        return best;
+      }
+    }
+
+    // Build a minimal GIF89a file for a single frame with no transparency or animation
+    function buildGIF(w, h, paletteBytes, indexed){
+      function u16(v){ return [v & 0xFF, (v>>8) & 0xFF]; }
+      const bytes = [];
+      function push(arr){ for (let i=0;i<arr.length;i++) bytes.push(arr[i]); }
+
+      // Header + Logical Screen Descriptor
+      push([0x47,0x49,0x46,0x38,0x39,0x61]); // GIF89a
+      push(u16(w));
+      push(u16(h));
+      const gctFlag = 1<<7; // global color table flag
+      const colorRes = 0x70; // color resolution (7)
+      const sortFlag = 0;
+      const gctSize = 0x07; // 2^(7+1) = 256 colors
+      push([gctFlag | colorRes | sortFlag | gctSize]);
+      push([0x00]); // background color index
+      push([0x00]); // pixel aspect ratio
+
+      // Global Color Table (256*3)
+      push(paletteBytes);
+
+      // Image Descriptor
+      push([0x2C]); // Image Separator
+      push([0x00,0x00,0x00,0x00]); // left, top
+      push(u16(w));
+      push(u16(h));
+      push([0x00]); // no local color table, no interlace
+
+      // LZW Image Data
+      const lzwMinCodeSize = 8; // 8-bit (since 256-color)
+      push([lzwMinCodeSize]);
+
+      const lzwData = lzwCompress(indexed, 8);
+      // split into sub-blocks up to 255 bytes
+      let i=0;
+      while (i < lzwData.length) {
+        const n = Math.min(255, lzwData.length - i);
+        push([n]);
+        push(lzwData.slice(i, i+n));
+        i += n;
+      }
+      push([0x00]); // block terminator
+
+      // Trailer
+      push([0x3B]);
+      return bytes;
+    }
+
+    // Basic LZW for GIF (no clear/end codes handling glitches)
+    function lzwCompress(indexed, colorBits){
+      const clearCode = 1 << colorBits;
+      const endCode = clearCode + 1;
+      let codeSize = colorBits + 1;
+
+      function writeCode(code){
+        for (let i=0; i<codeSize; i++){
+          bitBuffer |= ((code >> i) & 1) << bitCount;
+          bitCount++;
+          if (bitCount === 8){ out.push(bitBuffer); bitBuffer = 0; bitCount = 0; }
+        }
+      }
+
+      const dict = new Map();
+      for (let i=0; i<clearCode; i++) dict.set(i.toString(), i);
+
+      const out = [];
+      let bitBuffer = 0, bitCount = 0;
+      writeCode(clearCode);
+
+      let w = '' + indexed[0];
+      let nextCode = endCode + 1;
+      for (let i=1; i<indexed.length; i++){
+        const k = indexed[i];
+        const wk = w + ',' + k;
+        if (dict.has(wk)){
+          w = wk;
+        } else {
+          writeCode(dict.get(w));
+          dict.set(wk, nextCode++);
+          if (nextCode === (1<<codeSize)) codeSize++;
+          w = '' + k;
+        }
+      }
+      writeCode(dict.get(w));
+      writeCode(endCode);
+
+      // flush bits
+      if (bitCount>0) out.push(bitBuffer);
+      return out;
+    }
+  </script>
+</body>
+</html>
