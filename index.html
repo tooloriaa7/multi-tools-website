@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOOLORIA - Multi Tool Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #1E1E2F;
+            color: #EAEAEA;
+            line-height: 1.6;
+            padding-bottom: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header Styles */
+        header {
+            background-color: #2B2D42;
+            padding: 1.5rem 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            color: #FFD700;
+            font-size: 2.5rem;
+        }
+
+        .logo h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #FFD700, #E6C200);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            color: #FFD700;
+            opacity: 0.9;
+            margin-top: 5px;
+            letter-spacing: 1px;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 3rem 0;
+            background: linear-gradient(135deg, rgba(43, 45, 66, 0.7), rgba(30, 30, 47, 0.9));
+            margin: 1rem auto;
+            border-radius: 15px;
+            max-width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #FFD700;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 0 auto 1.5rem;
+            color: #CCC;
+        }
+
+        /* Tools Grid */
+        .tools-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin-top: 2rem;
+        }
+
+        .tool-card {
+            background-color: #3A3D5B;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(255, 215, 0, 0.2);
+            transition: all 0.4s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tool-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #FFD700, #E6C200);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3), 0 0 25px rgba(255, 215, 0, 0.3);
+        }
+
+        .tool-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .tool-card:hover {
+            background-color: #FFD700;
+            color: #1E1E2F;
+        }
+
+        .tool-card:hover h3,
+        .tool-card:hover p {
+            color: #1E1E2F;
+        }
+
+        .tool-card:hover .tool-icon {
+            color: #1E1E2F;
+            transform: scale(1.1);
+        }
+
+        .tool-icon {
+            font-size: 2.5rem;
+            color: #FFD700;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .tool-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+            color: #FFD700;
+            transition: color 0.3s ease;
+        }
+
+        .tool-card p {
+            color: #CCC;
+            margin-bottom: 20px;
+            flex-grow: 1;
+            transition: color 0.3s ease;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #FFD700;
+            color: #1E1E2F;
+            padding: 12px 25px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .btn:hover {
+            background-color: #E6C200;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(230, 194, 0, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 3rem;
+            text-align: center;
+            padding: 1.5rem;
+            color: #AAA;
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(255, 215, 0, 0.1);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .tools-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+            
+            .hero h2 {
+                font-size: 2rem;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo h1 {
+                font-size: 1.8rem;
+            }
+            
+            .tool-card {
+                padding: 20px;
+            }
+        }
+
+        /* Animation for tool cards */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tool-card {
+            animation: fadeInUp 0.6s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .tool-card:nth-child(1) { animation-delay: 0.1s; }
+        .tool-card:nth-child(2) { animation-delay: 0.2s; }
+        .tool-card:nth-child(3) { animation-delay: 0.3s; }
+        .tool-card:nth-child(4) { animation-delay: 0.4s; }
+        .tool-card:nth-child(5) { animation-delay: 0.5s; }
+        .tool-card:nth-child(6) { animation-delay: 0.6s; }
+        .tool-card:nth-child(7) { animation-delay: 0.7s; }
+        .tool-card:nth-child(8) { animation-delay: 0.8s; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-tools logo-icon"></i>
+                    <div>
+                        <h1>TOOLORIA</h1>
+                        <div class="tagline">Your Ultimate Digital Toolkit</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <section class="hero">
+            <h2>Multi Tool Hub</h2>
+            <p>Access a powerful suite of digital tools designed to simplify your daily tasks. From media processing to financial calculations, we've got you covered.</p>
+        </section>
+
+        <div class="tools-container">
+            <!-- Image Converter -->
+            <div class="tool-card">
+                <i class="fas fa-exchange-alt tool-icon"></i>
+                <h3>Image Converter</h3>
+                <p>Convert images between different formats including JPG, PNG, WEBP, and more with high quality preservation.</p>
+                <button class="btn" onclick="redirectToTool('Image Converter')">Use Tool</button>
+            </div>
+
+            <!-- Image Compressor -->
+            <div class="tool-card">
+                <i class="fas fa-compress-alt tool-icon"></i>
+                <h3>Image Compressor</h3>
+                <p>Reduce image file sizes without noticeable quality loss. Perfect for optimizing web images.</p>
+                <button class="btn" onclick="redirectToTool('Image Compressor')">Use Tool</button>
+            </div>
+
+            <!-- Image Crop -->
+            <div class="tool-card">
+                <i class="fas fa-crop-alt tool-icon"></i>
+                <h3>Image Crop</h3>
+                <p>Crop and resize images to your exact specifications. Supports aspect ratio locking.</p>
+                <button class="btn" onclick="redirectToTool('Image Crop')">Use Tool</button>
+            </div>
+
+            <!-- Video Converter -->
+            <div class="tool-card">
+                <i class="fas fa-film tool-icon"></i>
+                <h3>Video Converter</h3>
+                <p>Convert video files between popular formats like MP4, MOV, AVI, and more.</p>
+                <button class="btn" onclick="redirectToTool('Video Converter')">Use Tool</button>
+            </div>
+
+            <!-- Age Calculator -->
+            <div class="tool-card">
+                <i class="fas fa-birthday-cake tool-icon"></i>
+                <h3>Age Calculator</h3>
+                <p>Calculate your exact age in years, months, and days. Perfect for important milestones.</p>
+                <button class="btn" onclick="redirectToTool('Age Calculator')">Use Tool</button>
+            </div>
+
+            <!-- EMI Calculator -->
+            <div class="tool-card">
+                <i class="fas fa-calculator tool-icon"></i>
+                <h3>EMI Calculator</h3>
+                <p>Calculate your Equated Monthly Installments for loans with detailed breakdown.</p>
+                <button class="btn" onclick="redirectToTool('EMI Calculator')">Use Tool</button>
+            </div>
+
+            <!-- SIP Calculator -->
+            <div class="tool-card">
+                <i class="fas fa-chart-line tool-icon"></i>
+                <h3>SIP Calculator</h3>
+                <p>Plan your Systematic Investment Plan returns with our advanced calculator.</p>
+                <button class="btn" onclick="redirectToTool('SIP Calculator')">Use Tool</button>
+            </div>
+
+            <!-- Audio Trim -->
+            <div class="tool-card">
+                <i class="fas fa-music tool-icon"></i>
+                <h3>Audio Trim</h3>
+                <p>Trim audio files to the perfect length. Supports MP3, WAV, and other popular formats.</p>
+                <button class="btn" onclick="redirectToTool('Audio Trim')">Use Tool</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 TOOLORIA - Multi Tool Hub. All rights reserved.</p>
+            <p>Premium digital tools for professionals and enthusiasts</p>
+        </div>
+    </footer>
+
+    <script>
+        function redirectToTool(toolName) {
+            alert(`Redirecting to ${toolName}...`);
+            // In a real implementation, this would redirect to the actual tool page
+            // window.location.href = toolName.toLowerCase().replace(/\s+/g, '-') + '.html';
+        }
+    </script>
+</body>
+</html>
